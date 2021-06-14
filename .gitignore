@@ -1,6 +1,9 @@
 # "Default" build tree
 /build/
 
+# Visual Studio build output
+/out/
+
 # PyCharm help directory
 venv/
 
@@ -62,3 +65,6 @@ cmake-build-*/
 
 # Vim
 *.swp
+
+# VS Code files
+.vs/
