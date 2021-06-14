@@ -2545,25 +2545,32 @@ void indent_text(void)
             // PR#381
             log_rule_B("indent_param");
 
-            if (options::indent_param() != 0)
+            // Ignore these function param indentation rules for function calls when using EDK2 style
+            // Use the normal rules for functions definitions and prototypes
+            if (  !options::indent_func_call_edk2_style()
+               || (  options::indent_func_call_edk2_style()
+                  && (get_chunk_parent_type(pc) == CT_FUNC_DEF || get_chunk_parent_type(pc) == CT_FUNC_PROTO)))
             {
-               frm.top().indent = frm.at(idx).indent + options::indent_param();
-               log_indent();
-            }
-            else
-            {
-               frm.top().indent = frm.at(idx).indent + indent_size;
-               log_indent();
-            }
-            log_rule_B("indent_func_param_double");
+               if (options::indent_param() != 0)
+               {
+                  frm.top().indent = frm.at(idx).indent + options::indent_param();
+                  log_indent();
+               }
+               else
+               {
+                  frm.top().indent = frm.at(idx).indent + indent_size;
+                  log_indent();
+               }
+               log_rule_B("indent_func_param_double");
 
-            if (options::indent_func_param_double())
-            {
-               // double is: Use both values of the options indent_columns and indent_param
-               frm.top().indent += indent_size;
-               log_indent();
+               if (options::indent_func_param_double())
+               {
+                  // double is: Use both values of the options indent_columns and indent_param
+                  frm.top().indent += indent_size;
+                  log_indent();
+               }
+               frm.top().indent_tab = frm.top().indent;
             }
-            frm.top().indent_tab = frm.top().indent;
          }
          else if (  options::indent_oc_inside_msg_sel()
                  && chunk_is_token(pc, CT_PAREN_OPEN)
@@ -2607,6 +2614,18 @@ void indent_text(void)
             log_indent();
 
             frm.top().indent_tab = frm.top().indent;
+            skipped = true;
+         }
+         // Special handling for ed2k style DEBUG macro function calls
+         else if (  options::indent_func_call_edk2_style()
+                 && chunk_is_token(pc, CT_PAREN_OPEN)
+                 && chunk_is_token(chunk_get_prev_nc(pc), CT_FPAREN_OPEN)
+                 && are_chunks_in_same_line(chunk_get_prev_nc(pc), pc)
+                 && strcmp(chunk_get_prev_type(pc, CT_FUNC_CALL, ANY_LEVEL)->text(), "DEBUG") == 0)
+         {
+            LOG_FMT(LINDENT, "%s[line %d]: %zu] edk2 DEBUG macro => %zu [%s] frm_size = %zu\n",
+                    __func__, __LINE__, pc->orig_line, indent_column, frm.top().pc->text(), frm.size());
+            frm.top().indent = frm.at(frm.size() - 2).indent;
             skipped = true;
          }
          else if (  (  chunk_is_str(pc, "(", 1)
@@ -2669,7 +2688,31 @@ void indent_text(void)
                      sub = sub + 1;
                   }
                }
-               frm.top().indent = frm.at(sub).indent + indent_size;
+
+               if (options::indent_func_call_edk2_style() && get_chunk_parent_type(pc) == CT_FUNC_CALL)
+               {
+                  // EDK2 function call indentation style
+                  // TODO: Force insert newline between '(' & first param, when multi-line, otherwise indent isn't applied
+                  chunk_t *prevc = chunk_get_prev_type(pc, CT_FUNC_CALL, ANY_LEVEL);
+
+                  if (prevc != NULL)
+                  {
+                     LOG_FMT(LINDLINE, "%s(%d): prev func name is %s\n", __func__, __LINE__, prevc->text());
+
+                     if (strcmp(prevc->text(), "DEBUG") != 0)
+                     {
+                        frm.top().indent = prevc->column + 2;
+                     }
+                  }
+                  else
+                  {
+                     frm.top().indent = frm.at(sub).indent + indent_size;
+                  }
+               }
+               else
+               {
+                  frm.top().indent = frm.at(sub).indent + indent_size;
+               }
                log_indent();
 
                frm.top().indent_tab = frm.top().indent;
@@ -2690,14 +2733,32 @@ void indent_text(void)
                      }
                   }
 
-                  if (chunk_is_comment(next->prev))
+                  if (options::indent_func_call_edk2_style() && get_chunk_parent_type(pc) == CT_FUNC_CALL)
                   {
-                     // Issue #2099
-                     frm.top().indent = next->prev->column;
+                     // EDK2 function call indentation style
+                     // This gets applied when the first parameter isn't on a new line (technically doesn't follow EDK2 spec)
+                     chunk_t *prevc = chunk_get_prev_type(pc, CT_FUNC_CALL, ANY_LEVEL);
+
+                     if (prevc != NULL)
+                     {
+                        frm.top().indent = prevc->column + 2;
+                     }
+                     else
+                     {
+                        frm.top().indent = next->column;
+                     }
                   }
                   else
                   {
-                     frm.top().indent = next->column;
+                     if (chunk_is_comment(next->prev))
+                     {
+                        // Issue #2099
+                        frm.top().indent = next->prev->column;
+                     }
+                     else
+                     {
+                        frm.top().indent = next->column;
+                     }
                   }
                   log_indent();
                }
@@ -3343,11 +3404,15 @@ void indent_text(void)
       {
          vardefcol = 0;
       }
+      // Do not indent types if on a newline after a typedef
+      chunk_t *prev_chunk       = chunk_get_prev(pc);
+      chunk_t *prev_ncnnl_chunk = chunk_get_prev_ncnnl(pc);
 
       // Indent the line if needed
       if (  did_newline
          && !chunk_is_newline(pc)
-         && (pc->len() != 0))
+         && (pc->len() != 0)
+         && !(options::indent_func_call_edk2_style() && (prev_chunk != nullptr) && (prev_ncnnl_chunk != nullptr) && chunk_is_token(pc, CT_TYPE) && chunk_is_token(prev_chunk, CT_NEWLINE) && chunk_is_token(prev_ncnnl_chunk, CT_TYPEDEF)))
       {
          pc->column_indent = frm.top().indent_tab;
 
@@ -3603,6 +3668,7 @@ void indent_text(void)
                }
             }
             size_t indent_value = 0;
+            bool   ignore       = false;
             LOG_FMT(LINDENT, "%s(%d): orig_line is %zu, closing parenthesis => %zu, text is '%s'\n",
                     __func__, __LINE__, pc->orig_line, indent_column, pc->text());
             LOG_FMT(LINDENT, "%s(%d): [%s/%s]\n",
@@ -3629,11 +3695,39 @@ void indent_text(void)
                   indent_value = indent_column;
                }
             }
+            else if (get_chunk_parent_type(pc) == CT_FUNC_CALL)
+            {
+               if (!options::use_indent_func_call_param())
+               {
+                  // Don't indent function call parameters
+                  ignore = true;
+               }
+               else
+               {
+                  // Special handling for closing parenthesis indentation in edk2 typedef function prototypes
+                  if (  options::indent_func_call_edk2_style()
+                     && chunk_is_token(pc, CT_FPAREN_CLOSE)
+                     && (frm.poped().type == CT_FPAREN_OPEN))
+                  {
+                     chunk_t *last_frame_prev_chunk = chunk_get_prev_ncnnlnp(frm.poped().pc);
+
+                     if ((last_frame_prev_chunk != nullptr) && chunk_is_token(last_frame_prev_chunk, CT_PAREN_CLOSE))
+                     {
+                        indent_column = options::indent_param() + 1;
+                     }
+                  }
+                  indent_value = (!ignore) ? indent_column : indent_value;
+               }
+            }
             else
             {
                indent_value = indent_column;
             }
-            reindent_line(pc, indent_value);
+
+            if (!ignore)
+            {
+               reindent_line(pc, indent_value);
+            }
          }
          else if (chunk_is_token(pc, CT_COMMA))
          {
@@ -3783,6 +3877,18 @@ void indent_text(void)
                   if (options::use_indent_func_call_param())
                   {
                      LOG_FMT(LINDPC, "use is true [%d]\n", __LINE__);
+
+                     // Indent typedef function prototype parameters edk2 style
+                     if (options::indent_func_call_edk2_style() && chunk_is_token(frm.top().pc, CT_FPAREN_OPEN))
+                     {
+                        chunk_t *top_frame_prev_chunk = chunk_get_prev_ncnnlnp(frm.top().pc);
+
+                        if ((top_frame_prev_chunk != nullptr) && chunk_is_token(top_frame_prev_chunk, CT_PAREN_CLOSE))
+                        {
+                           indent_column = options::indent_param() + 1;
+                           LOG_FMT(LINDPC, "indenting typedef function parameters [%d]\n", __LINE__);
+                        }
+                     }
                   }
                   else
                   {

@@ -1687,6 +1687,10 @@ indent_ignore_asm_block;
 extern Option<bool>
 donot_indent_func_def_close_paren;
 
+// Use EDK2 indentation style for function calls
+extern Option<bool>
+indent_func_call_edk2_style;
+
 //END
 
 ///////////////////////////////////////////////////////////////////////////////

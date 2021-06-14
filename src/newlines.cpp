@@ -2838,6 +2838,7 @@ static void newline_func_multi_line(chunk_t *start)
    bool add_start;
    bool add_args;
    bool add_end;
+   bool edk2_debug_macro = false;
 
    if (  get_chunk_parent_type(start) == CT_FUNC_DEF
       || get_chunk_parent_type(start) == CT_FUNC_CLASS_DEF)
@@ -2849,9 +2850,26 @@ static void newline_func_multi_line(chunk_t *start)
       log_rule_B("nl_func_def_end_multi_line");
       add_end = options::nl_func_def_end_multi_line();
    }
-   else if (  get_chunk_parent_type(start) == CT_FUNC_CALL
-           || get_chunk_parent_type(start) == CT_FUNC_CALL_USER)
+   else if ((  get_chunk_parent_type(start) == CT_FUNC_CALL
+            || get_chunk_parent_type(start) == CT_FUNC_CALL_USER))
    {
+      chunk_t *prev_chunk = chunk_get_prev_type(start, CT_FUNC_CALL, ANY_LEVEL);
+
+      if (prev_chunk != nullptr && strcmp(prev_chunk->text(), "DEBUG") == 0)
+      {
+         // edk2 DEBUG MACRO - set start equal to the chunk after the second parenthesis
+         chunk_t *next_chunk = chunk_get_next_ncnnl(start);
+
+         if (next_chunk == nullptr || chunk_is_newline_between(start, next_chunk))
+         {
+            return;
+         }
+         else
+         {
+            edk2_debug_macro = true;
+            start            = next_chunk;
+         }
+      }
       log_rule_B("nl_func_call_start_multi_line");
       add_start = options::nl_func_call_start_multi_line();
       log_rule_B("nl_func_call_args_multi_line");
@@ -2881,6 +2899,11 @@ static void newline_func_multi_line(chunk_t *start)
          && pc->level > start->level)
    {
       pc = chunk_get_next_ncnnl(pc);
+   }
+
+   if (edk2_debug_macro && chunk_is_token(chunk_get_next_ncnnl(pc), CT_FPAREN_CLOSE))
+   {
+      pc = chunk_get_next_ncnnl(pc);  // push debug macros to the next (second) closing parenthesis
    }
 
    if (  chunk_is_token(pc, CT_FPAREN_CLOSE)
@@ -2915,22 +2938,29 @@ static void newline_func_multi_line(chunk_t *start)
          }
       }
 
-      if (  add_end
-         && !chunk_is_newline(chunk_get_prev(pc)))
+      if (add_end)
       {
-         log_rule_B("nl_func_call_args_multi_line_ignore_closures");
-
-         if (options::nl_func_call_args_multi_line_ignore_closures())
+         if (edk2_debug_macro)
          {
-            if (  !has_leading_closure
-               && !has_trailing_closure)
+            pc = chunk_get_prev_ncnnl(pc);
+         }
+
+         if (!chunk_is_newline(chunk_get_prev(pc)))
+         {
+            log_rule_B("nl_func_call_args_multi_line_ignore_closures");
+
+            if (options::nl_func_call_args_multi_line_ignore_closures())
+            {
+               if (  !has_leading_closure
+                  && !has_trailing_closure)
+               {
+                  newline_iarf(chunk_get_prev(pc), IARF_ADD);
+               }
+            }
+            else
             {
                newline_iarf(chunk_get_prev(pc), IARF_ADD);
             }
-         }
-         else
-         {
-            newline_iarf(chunk_get_prev(pc), IARF_ADD);
          }
       }
 
