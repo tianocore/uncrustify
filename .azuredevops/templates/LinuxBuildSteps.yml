@@ -1,0 +1,48 @@
+## @file
+# Azure Pipeline application build steps to build Uncrustify on Linux
+#
+# Copyright (c) Microsoft Corporation.
+#
+##
+
+steps:
+- script: |
+    if [ -n "${C_COMPILER}" ]; then export CC="${C_COMPILER}"; fi
+    if [ -n "${CXX_COMPILER}" ]; then export CXX="${CXX_COMPILER}"; fi
+    ${CXX} --version
+    cmake --version
+    cd $BUILD_SOURCESDIRECTORY
+    mkdir build
+    cd build
+    type -p ninja && export GENERATOR=-GNinja || true
+
+    # to stop the script after an error/warning
+    set -e
+
+    # prepare make files with cmake
+    pwd
+    case "${BUILD_TYPE}" in
+      "coverage")
+        cmake ${GENERATOR} -DCMAKE_BUILD_TYPE=Debug -DENABLE_CODECOVERAGE=ON .. | tee cmake_gen_log.txt
+        ;;
+      "asan")
+        cmake ${GENERATOR} -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZER=address ..| tee cmake_gen_log.txt
+        ;;
+      "ubsan")
+        cmake ${GENERATOR} -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZER=undefined .. | tee cmake_gen_log.txt
+        ;;
+      "cross")
+        cmake ${GENERATOR} -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-mingw64.cmake -DCMAKE_EXE_LINKER_FLAGS="-static -s" .. | tee cmake_gen_log.txt
+        ;;
+      "release")
+        cmake ${GENERATOR} -DCMAKE_BUILD_TYPE=Release .. | tee cmake_gen_log.txt
+        ;;
+      *)
+        echo ${GENERATOR}
+        cmake ${GENERATOR} .. | tee cmake_gen_log.txt
+        ;;
+    esac
+    ls -l
+    if [ -f build.ninja ]; then ninja -v; else make VERBOSE=1 | tee build_log.txt; fi
+
+  displayName: Linux Build

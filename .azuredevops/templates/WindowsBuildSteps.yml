@@ -1,0 +1,26 @@
+## @file
+# Azure Pipeline application build steps to build Uncrustify on Windows
+#
+# Copyright (c) Microsoft Corporation.
+#
+##
+
+steps:
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      mkdir build
+      cd build
+      cmake -DUNCRUSTIFY_SEPARATE_TESTS=ON -G "$($env:GENERATOR)" -A x64 .. | Tee-Object -FilePath cmake_gen_log.txt
+      cmake --build . --config $($env:BUILD_TYPE) | Tee-Object -FilePath build_log.txt
+  displayName: Windows Build
+
+# Copy the executable from a build type specific directory to the upper build directory on Windows
+- task: CopyFiles@2
+  inputs:
+    contents: '$(Build.SourcesDirectory)/build/$(build_type)/$(application_executable_name)'
+    targetFolder: '$(Build.SourcesDirectory)/build'
+    flattenFolders: true
+  displayName: Copy Uncrustify Executable on Windows Builds
+  condition: and(succeeded(), ne(variables['build_type'], 'xcross'))

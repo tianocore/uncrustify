@@ -1,0 +1,24 @@
+## @file
+# Azure Pipeline build file to build and test Uncrustify
+# release build on Windows with Visual Studio
+#
+# This file is intended to be called with the variables
+# set in the Azure Pipeline settings.
+#
+# Copyright (c) Microsoft Corporation.
+#
+##
+
+trigger: none
+pr: none
+
+variables:
+  - name: application_executable_name
+    value: uncrustify.exe
+
+stages:
+- template: BuildStage.yml
+  parameters:
+    build_os: windows
+    build_type: release
+    generator: Visual Studio 16 2019

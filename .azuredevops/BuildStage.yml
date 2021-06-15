@@ -1,0 +1,144 @@
+## @file
+# Azure Pipeline build file to build and test Uncrustify
+#
+# Copyright (c) Microsoft Corporation.
+#
+##
+
+parameters:
+- name: build_os
+  type: string
+  default: windows
+  values:
+  - ubuntu
+  - windows
+- name: build_type
+  type: string
+  default: debug
+  values:
+  - debug
+  - release
+- name: generator
+  type: string
+  default: Visual Studio 16 2019
+- name: python_version
+  type: string
+  default: 3.9.x
+
+stages:
+- stage: BuildStage
+  displayName: Build
+
+  variables:
+  - name: build_type
+    value: ${{ parameters.build_type }}
+  - name: generator
+    value: ${{ parameters.generator }}
+
+  pool:
+    vmImage: ${{ format('{0}-latest', parameters.build_os) }}
+
+  jobs:
+
+  - job: ValidateBuildParameters
+    displayName: Validate Build Parameters
+
+    steps:
+    - checkout: none
+
+    - ${{ each parameter in parameters }}:
+        - bash: |
+            if [ -z "${{ parameter.Value }}" ]; then
+              echo "##vso[task.logissue type=error;]Missing template parameter \"${{ parameter.Key }}\""
+              echo "##vso[task.complete result=Failed;]"
+            fi
+          displayName: 'Checking ${{ parameter.Key }}'
+
+  - job: BuildApplication
+    displayName: Build Application
+
+    workspace:
+      clean: all
+
+    steps:
+    - checkout: self
+      clean: true
+
+    - task: UsePythonVersion@0
+      displayName: Use Python ${{ parameters.python_version }}
+      inputs:
+        versionSpec: ${{ parameters.python_version }}
+        architecture: 'x64'
+
+    # Run OS-specific build commands
+    - ${{ if eq(parameters.build_os, 'ubuntu') }}:
+      - template: templates/LinuxBuildSteps.yml
+    - ${{ if eq(parameters.build_os, 'windows') }}:
+      - template: templates/WindowsBuildSteps.yml
+
+    - task: CopyFiles@2
+      inputs:
+        contents: '$(Build.SourcesDirectory)/build/*_log.txt'
+        targetFolder: '$(Build.ArtifactStagingDirectory)/build_logs'
+        flattenFolders: true
+      displayName: Stage Build Logs
+      condition: succeededOrFailed()
+
+    - task: PublishBuildArtifacts@1
+      continueOnError: true
+      displayName: Publish Build Logs
+      inputs:
+        pathtoPublish: '$(Build.ArtifactStagingDirectory)/build_logs'
+        artifactName: 'Build_Logs'
+      condition: succeededOrFailed()
+
+    - task: PublishBuildArtifacts@1
+      continueOnError: true
+      displayName: Publish Application Documentation
+      inputs:
+        pathtoPublish: '$(Build.SourcesDirectory)/build/uncrustify.1'
+        artifactName: 'Documentation'
+      condition: succeeded()
+
+    - task: PublishBuildArtifacts@1
+      continueOnError: true
+      displayName: Publish Application Binary
+      inputs:
+        pathtoPublish: '$(Build.SourcesDirectory)/build/$(application_executable_name)'
+        artifactName: 'Executable'
+      condition: succeeded()
+
+    - task: CmdLine@1
+      name: RunAllCTests
+      displayName: Run All cTest Unit Tests
+      inputs:
+        filename: python
+        arguments: ../scripts/run_ctest.py -- -C $(build_type)
+        workingFolder: '$(Build.SourcesDirectory)/build'
+      condition: and(succeeded(), ne(variables['build_type'], 'xcross'))
+
+    - task: CopyFiles@2
+      inputs:
+        contents: '$(Build.SourcesDirectory)/build/**/Test.xml'
+        targetFolder: '$(Build.ArtifactStagingDirectory)/test_results'
+        flattenFolders: true
+      displayName: Stage Test Results
+      condition: and(succeededOrFailed(), ne(variables['build_type'], 'xcross'))
+
+    - task: PublishBuildArtifacts@1
+      continueOnError: true
+      displayName: Publish cTest Result Logs
+      inputs:
+        pathtoPublish: '$(Build.ArtifactStagingDirectory)/test_results'
+        artifactName: 'Test_Results'
+      condition: and(succeededOrFailed(), ne(variables['build_type'], 'xcross'))
+
+    - task: PublishTestResults@2
+      displayName: Publish cTest Results
+      continueOnError: true
+      inputs:
+        testResultsFormat: 'cTest'                    # Options: JUnit, NUnit, VSTest, xUnit, cTest
+        testResultsFiles: '$(Build.SourcesDirectory)/build/Testing/**/Test.xml'
+        testRunTitle: Uncrustify Application Tests    # Optional
+        publishRunAttachments: true                   # Optional
+      condition: and(succeededOrFailed(), ne(variables['build_type'], 'xcross'))

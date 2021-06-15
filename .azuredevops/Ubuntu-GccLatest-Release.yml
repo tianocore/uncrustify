@@ -1,0 +1,24 @@
+## @file
+# Azure Pipeline build file to build and test Uncrustify
+# release build on Ubuntu with the latest GCC release
+#
+# This file is intended to be called with the variables
+# set in the Azure Pipeline settings.
+#
+# Copyright (c) Microsoft Corporation.
+#
+##
+
+trigger: none
+pr: none
+
+variables:
+  - name: application_executable_name
+    value: uncrustify
+
+stages:
+- template: BuildStage.yml
+  parameters:
+    build_os: ubuntu
+    build_type: release
+    generator: ' '
