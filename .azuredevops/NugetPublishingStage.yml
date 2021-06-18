@@ -1,0 +1,155 @@
+## @file
+# Azure Pipeline build file to build and test Uncrustify
+#
+# Copyright (c) Microsoft Corporation.
+#
+##
+
+trigger: none
+pr: none
+
+parameters:
+- name: python_version
+  displayName: Python Version
+  type: string
+  default: '3.9.x'
+- name: nuget_package_upstream_major_version
+  displayName: Upstream Major Version
+  type: number
+  default: 0
+- name: nuget_package_upstream_minor_version
+  displayName: Upstream Minor Version
+  type: number
+  default: 0
+- name: nuget_package_mu_fork_patch_version
+  displayName: Nuget Patch Version for Project Mu Fork (must be >0)
+  type: number
+  default: 0
+
+name: v${{ parameters.nuget_package_upstream_major_version }}.${{ parameters.nuget_package_upstream_minor_version }}.${{ parameters.nuget_package_mu_fork_patch_version }} Build_$(Date:yyyyMMdd)$(Rev:.r)
+
+strategy:
+  matrix:
+    'Ubuntu GCC Latest Debug':
+      build_type: debug
+      target_os: ubuntu
+      pipeline_name: 'Ubuntu GCC Latest Debug'
+    'Ubuntu GCC Latest Release':
+      build_type: release
+      target_os: ubuntu
+      pipeline_name: 'Ubuntu GCC Latest Release'
+    'Windows VS2019 Debug':
+      build_type: debug
+      target_os: windows
+      pipeline_name: 'Windows VS2019 Debug'
+    'Windows VS2019 Release':
+      build_type: release
+      target_os: windows
+      pipeline_name: 'Windows VS2019 Release'
+
+pool:
+  vmImage: windows-latest
+
+steps:
+- checkout: none
+
+- ${{ each parameter in parameters }}:
+  - bash: |
+      if [ -z "${{ parameter.Value }}" ]; then
+        echo "##vso[task.logissue type=error;]Missing template parameter \"${{ parameter.Key }}\""
+        echo "##vso[task.complete result=Failed;]"
+      fi
+    displayName: 'Validating ${{ parameter.Key }}'
+
+# The major version should always be greater than zero
+# The minor version can be zero
+# The fork patch version should always be greater than zero (start at 1)
+- task: PowerShell@2
+  displayName: Cancel if Upstream Major Version is Not Set
+  inputs:
+      targetType: 'inline'
+      script: |
+        echo "##vso[task.logissue type=error;]Upstream Major Version is Not Set"
+        echo "##vso[task.complete result=Failed;]"
+  condition: eq('${{ parameters.nuget_package_upstream_major_version }}', 0)
+
+- task: PowerShell@2
+  displayName: Cancel if Project Mu Patch Version is Not Set
+  inputs:
+      targetType: 'inline'
+      script: |
+        echo "##vso[task.logissue type=error;]Project Mu Patch Version is Not Set"
+        echo "##vso[task.complete result=Failed;]"
+  condition: eq('${{ parameters.nuget_package_mu_fork_patch_version }}', 0)
+
+- task: UsePythonVersion@0
+  displayName: Use Python ${{ parameters.python_version }}
+  inputs:
+    versionSpec: ${{ parameters.python_version }}
+    architecture: 'x64'
+
+- script: python -m pip install edk2-pytool-extensions==0.14.*
+  displayName: 'Install tools'
+
+- task: DownloadBuildArtifacts@0
+  name: DownloadBuildArtifacts
+  displayName: Download $(target_os).x64.$(build_type) Build Artifacts
+  inputs:
+    buildType: 'specific'
+    project: $(System.TeamProject)
+    pipeline: $(pipeline_name)
+    specificBuildWithTriggering: true
+    buildVersionToDownload: 'latest'       # Change to accept a specific version in the future (if needed)
+    tags: 'release'                        # Only publish builds with the "release" tag set
+    downloadType: 'single'
+    artifactName: 'Executable'
+    downloadPath: '$(Build.StagingDirectory)/Nuget/package_contents'
+
+- task: PowerShell@2
+  displayName: Generate Nuget Config File
+  inputs:
+      targetType: 'inline'
+      script: |
+          $build_info = "$($env:TARGET_OS).x64.$($env:BUILD_TYPE)";
+          $author = 'author_string: Project Mu Uncrustify Fork';
+          $copyright = 'copyright_string: Copyright (c) ' + (Get-Date -Format yyyy);
+          $description = 'description_string: Project Mu fork of the Uncrustify project.';
+          $license = 'license_url: https://github.com/uncrustify/uncrustify/blob/master/COPYING';
+          $name = 'name: TEST.mu.uncrustify' + '.' + $build_info;
+          $project_url = 'project_url: https://dev.azure.com/projectmu/Uncrustify';
+          $server_url = 'server_url: https://pkgs.dev.azure.com/projectmu/Uncrustify/_packaging/mu_uncrustify/nuget/v3/index.json';
+          $tags = 'tags_string: ''''';
+          $complete_file_content_string = $author,$copyright,$description,$license,$name,$project_url,$server_url,$tags -join "`r`n";
+          Write-Host "Generated Nuget config file contents:`n`n$complete_file_content_string";
+          $complete_file_content_string | Out-File -Encoding ascii -FilePath (New-Item -Path ("$($env:BUILD_STAGINGDIRECTORY)/Nuget/config/uncrustify_" + ($build_info.Replace(".", "_")) + ".yaml") -Force);
+
+- task: NuGetAuthenticate@0
+  displayName: Nuget Authentication
+
+- task: PowerShell@2
+  name: PackNugetPackage
+  displayName: Pack and Push Project Mu Uncrustify $(target_os).x64.$(build_type) Nuget Package
+  inputs:
+    targetType: 'inline'
+    script: |
+        $build_info = "$($env:TARGET_OS)_x64_$($env:BUILD_TYPE)";
+        $configFilePath = ("$($env:BUILD_STAGINGDIRECTORY)/Nuget/config/uncrustify_$build_info.yaml");
+        $inputFolderPath = "$($env:BUILD_STAGINGDIRECTORY)/Nuget/package_contents";
+        $outputLogPath = $($env:BUILD_STAGINGDIRECTORY) + '/Nuget/nuget_uncrustify_' + $($env:TARGET_OS) + '_x64_' + $($env:BUILD_TYPE) + '_packaging_log.txt';
+        $packageVersion = "{0}.{1}.{2}" -f ${{ parameters.nuget_package_upstream_major_version }},${{ parameters.nuget_package_upstream_minor_version }},${{ parameters.nuget_package_mu_fork_patch_version }};
+        Write-Host $build_info
+        Write-Host $configFilePath
+        Write-Host $inputFolderPath
+        Write-Host $outputLogPath
+        Write-Host $packageVersion
+        Get-Content $configFilePath
+
+        nuget-publish --Operation PackAndPush --OutputLog "$outputLogPath" --ConfigFilePath "$configFilePath" --InputFolderPath "$inputFolderPath" --Version $packageVersion;
+
+- task: PublishBuildArtifacts@1
+  continueOnError: true
+  displayName: Publish Nuget Output Log
+  inputs:
+    pathtoPublish: '$(Build.StagingDirectory)/Nuget/nuget_uncrustify_$(target_os)_x64_$(build_type)_packaging_log.txt'
+    artifactName: 'Nuget_Log'
+  condition: succeededOrFailed()
