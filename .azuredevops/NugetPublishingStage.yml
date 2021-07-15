@@ -28,24 +28,23 @@ parameters:
 
 name: v${{ parameters.nuget_package_upstream_major_version }}.${{ parameters.nuget_package_upstream_minor_version }}.${{ parameters.nuget_package_mu_fork_patch_version }} Build_$(Date:yyyyMMdd)$(Rev:.r)
 
+variables:
+- name: linux_target_os_name
+  value: ubuntu
+- name: windows_target_os_name
+  value: windows
+
 strategy:
   matrix:
-    'Ubuntu GCC Latest Debug':
+    'Debug':
       build_type: debug
-      target_os: ubuntu
-      pipeline_name: 'Ubuntu GCC Latest Debug'
-    'Ubuntu GCC Latest Release':
+      linux_pipeline_name: 'Ubuntu GCC Latest Debug'
+      windows_pipeline_name: 'Windows VS2019 Debug'
+    'Release':
       build_type: release
       target_os: ubuntu
-      pipeline_name: 'Ubuntu GCC Latest Release'
-    'Windows VS2019 Debug':
-      build_type: debug
-      target_os: windows
-      pipeline_name: 'Windows VS2019 Debug'
-    'Windows VS2019 Release':
-      build_type: release
-      target_os: windows
-      pipeline_name: 'Windows VS2019 Release'
+      linux_pipeline_name: 'Ubuntu GCC Latest Release'
+      windows_pipeline_name: 'Windows VS2019 Release'
 
 pool:
   vmImage: windows-latest
@@ -92,57 +91,84 @@ steps:
   displayName: 'Install tools'
 
 - task: DownloadBuildArtifacts@0
-  name: DownloadBuildArtifacts
-  displayName: Download $(target_os).x64.$(build_type) Build Artifacts
+  name: DownloadLinuxBuildArtifacts
+  displayName: Download $(linux_target_os_name).x64.$(build_type) Build Artifacts
   inputs:
     buildType: 'specific'
     project: $(System.TeamProject)
-    pipeline: $(pipeline_name)
+    pipeline: $(linux_pipeline_name)
     specificBuildWithTriggering: true
     buildVersionToDownload: 'latest'       # Change to accept a specific version in the future (if needed)
     tags: 'release'                        # Only publish builds with the "release" tag set
     downloadType: 'single'
     artifactName: 'Executable'
-    downloadPath: '$(Build.StagingDirectory)/Nuget/package_contents'
+    downloadPath: '$(Build.StagingDirectory)/Artifacts/Linux-x86'
+
+- task: DownloadBuildArtifacts@0
+  name: DownloadWindowsBuildArtifacts
+  displayName: Download $(windows_target_os_name).x64.$(build_type) Build Artifacts
+  inputs:
+    buildType: 'specific'
+    project: $(System.TeamProject)
+    pipeline: $(windows_pipeline_name)
+    specificBuildWithTriggering: true
+    buildVersionToDownload: 'latest'       # Change to accept a specific version in the future (if needed)
+    tags: 'release'                        # Only publish builds with the "release" tag set
+    downloadType: 'single'
+    artifactName: 'Executable'
+    downloadPath: '$(Build.StagingDirectory)/Artifacts/Windows-x86'
+
+- task: CopyFiles@2
+  displayName: "Copy Linux Executable"
+  inputs:
+    targetFolder: '$(Build.StagingDirectory)/Nuget/package_contents/Linux-x86'
+    SourceFolder: '$(Build.StagingDirectory)/Artifacts/Linux-x86'
+    contents: '**'
+    flattenFolders: true
+
+- task: CopyFiles@2
+  displayName: "Copy Windows Executable"
+  inputs:
+    targetFolder: '$(Build.StagingDirectory)/Nuget/package_contents/Windows-x86'
+    SourceFolder: '$(Build.StagingDirectory)/Artifacts/Windows-x86'
+    contents: '**'
+    flattenFolders: true
 
 - task: PowerShell@2
   displayName: Generate Nuget Config File
   inputs:
       targetType: 'inline'
       script: |
-          $build_info = "$($env:TARGET_OS).x64.$($env:BUILD_TYPE)";
           $author = 'author_string: Project Mu Uncrustify Fork';
           $copyright = 'copyright_string: Copyright (c) ' + (Get-Date -Format yyyy);
           $description = 'description_string: Project Mu fork of the Uncrustify project.';
           $license = 'license_url: https://github.com/uncrustify/uncrustify/blob/master/COPYING';
-          $name = 'name: mu.uncrustify' + '.' + $build_info;
+          $name = 'name: mu-uncrustify-' + $($env:BUILD_TYPE);
           $project_url = 'project_url: https://dev.azure.com/projectmu/Uncrustify';
           $server_url = 'server_url: https://pkgs.dev.azure.com/projectmu/Uncrustify/_packaging/mu_uncrustify/nuget/v3/index.json';
           $tags = 'tags_string: ''''';
           $complete_file_content_string = $author,$copyright,$description,$license,$name,$project_url,$server_url,$tags -join "`r`n";
           Write-Host "Generated Nuget config file contents:`n`n$complete_file_content_string";
-          $complete_file_content_string | Out-File -Encoding ascii -FilePath (New-Item -Path ("$($env:BUILD_STAGINGDIRECTORY)/Nuget/config/uncrustify_" + ($build_info.Replace(".", "_")) + ".yaml") -Force);
+          $complete_file_content_string | Out-File -Encoding ascii -FilePath (New-Item -Path ("$($env:BUILD_STAGINGDIRECTORY)/Nuget/config/uncrustify_$($env:BUILD_TYPE).yaml") -Force);
 
 - task: NuGetAuthenticate@0
   displayName: Nuget Authentication
 
 - task: PowerShell@2
   name: PackNugetPackage
-  displayName: Pack and Push Project Mu Uncrustify $(target_os).x64.$(build_type) Nuget Package
+  displayName: Pack and Push Project Mu Uncrustify $(build_type) Nuget Package
   inputs:
     targetType: 'inline'
     script: |
-        $build_info = "$($env:TARGET_OS)_x64_$($env:BUILD_TYPE)";
-        $configFilePath = ("$($env:BUILD_STAGINGDIRECTORY)/Nuget/config/uncrustify_$build_info.yaml");
+        $configFilePath = ("$($env:BUILD_STAGINGDIRECTORY)/Nuget/config/uncrustify_$($env:BUILD_TYPE).yaml");
         $inputFolderPath = "$($env:BUILD_STAGINGDIRECTORY)/Nuget/package_contents";
-        $outputLogPath = $($env:BUILD_STAGINGDIRECTORY) + '/Nuget/nuget_uncrustify_' + $($env:TARGET_OS) + '_x64_' + $($env:BUILD_TYPE) + '_packaging_log.txt';
+        $outputLogPath = $($env:BUILD_STAGINGDIRECTORY) + '/Nuget/nuget_uncrustify_' + $($env:BUILD_TYPE) + '_packaging_log.txt';
         $packageVersion = "{0}.{1}.{2}" -f ${{ parameters.nuget_package_upstream_major_version }},${{ parameters.nuget_package_upstream_minor_version }},${{ parameters.nuget_package_mu_fork_patch_version }};
-        Write-Host $build_info
-        Write-Host $configFilePath
-        Write-Host $inputFolderPath
-        Write-Host $outputLogPath
-        Write-Host $packageVersion
-        Get-Content $configFilePath
+        Write-Host $configFilePath;
+        Write-Host $inputFolderPath;
+        Write-Host $outputLogPath;
+        Write-Host $packageVersion;
+        Get-Content $configFilePath;
 
         nuget-publish --Operation PackAndPush --OutputLog "$outputLogPath" --ConfigFilePath "$configFilePath" --InputFolderPath "$inputFolderPath" --Version $packageVersion;
 
@@ -150,6 +176,6 @@ steps:
   continueOnError: true
   displayName: Publish Nuget Output Log
   inputs:
-    pathtoPublish: '$(Build.StagingDirectory)/Nuget/nuget_uncrustify_$(target_os)_x64_$(build_type)_packaging_log.txt'
+    pathtoPublish: '$(Build.StagingDirectory)/Nuget/nuget_uncrustify_$(build_type)_packaging_log.txt'
     artifactName: 'Nuget_Log'
   condition: succeededOrFailed()
