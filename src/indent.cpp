@@ -2621,6 +2621,7 @@ void indent_text(void)
                  && chunk_is_token(pc, CT_PAREN_OPEN)
                  && chunk_is_token(chunk_get_prev_nc(pc), CT_FPAREN_OPEN)
                  && are_chunks_in_same_line(chunk_get_prev_nc(pc), pc)
+                 && (chunk_get_prev_type(pc, CT_FUNC_CALL, ANY_LEVEL) != nullptr)
                  && strcmp(chunk_get_prev_type(pc, CT_FUNC_CALL, ANY_LEVEL)->text(), "DEBUG") == 0)
          {
             LOG_FMT(LINDENT, "%s[line %d]: %zu] edk2 DEBUG macro => %zu [%s] frm_size = %zu\n",
