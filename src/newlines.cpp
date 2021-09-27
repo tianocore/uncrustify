@@ -2774,7 +2774,16 @@ static void newline_iarf_pair(chunk_t *before, chunk_t *after, iarf_e av, bool c
 
    if (  before == nullptr
       || after == nullptr
-      || chunk_is_token(after, CT_IGNORED))
+      || chunk_is_token(after, CT_IGNORED)
+         //
+         // edk2 change - start: Do not move "OPTIONAL" at end of function parameter to a newline
+         //
+         //               note: Setting OPTIONAL tokens to "CT_IGNORED" impacts spacing. If it is not
+         //                     explicitly set as a QUALIFIER in the config file, it is treated as a TYPE.
+         //                     Set to QUALIFIER in config file and specially handle the newline case here.
+         //
+      || (strcmp(after->text(), "OPTIONAL") == 0))
+   // edk2 change - end: Do not move "OPTIONAL" at end of function parameter to a newline
    {
       return;
    }
