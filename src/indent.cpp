@@ -3413,7 +3413,16 @@ void indent_text(void)
       if (  did_newline
          && !chunk_is_newline(pc)
          && (pc->len() != 0)
-         && !(options::indent_func_call_edk2_style() && (prev_chunk != nullptr) && (prev_ncnnl_chunk != nullptr) && chunk_is_token(pc, CT_TYPE) && chunk_is_token(prev_chunk, CT_NEWLINE) && chunk_is_token(prev_ncnnl_chunk, CT_TYPEDEF)))
+            // edk2 change - start: Prevent erroneous token concatenation in typedef function prototypes
+         && !(  options::indent_func_call_edk2_style()
+             && (prev_chunk != nullptr)
+             && (prev_ncnnl_chunk != nullptr)
+             && (  ((chunk_is_token(pc, CT_TYPE) || chunk_is_token(pc, CT_QUALIFIER)) && chunk_is_token(prev_chunk, CT_NEWLINE))
+                || (chunk_is_token(pc, CT_TYPE) && chunk_is_token(prev_chunk, CT_QUALIFIER))
+                || (chunk_is_token(pc, CT_PTR_TYPE) && chunk_is_token(prev_chunk, CT_TYPE))
+                   )
+             && (frm.top().type == CT_TYPEDEF)))
+      // edk2 change - end: Prevent erroneous token concatenation in typedef function prototypes
       {
          pc->column_indent = frm.top().indent_tab;
 
@@ -3761,7 +3770,9 @@ void indent_text(void)
          }
          else if (  options::indent_func_const()
                  && chunk_is_token(pc, CT_QUALIFIER)
-                 && strncasecmp(pc->text(), "const", pc->len()) == 0
+                    // edk2 change - start: Account for uppercase "CONST"
+                 && ((strncasecmp(pc->text(), "const", pc->len()) == 0) || (strncasecmp(pc->text(), "CONST", pc->len()) == 0))
+                    // edk2 change - end: Account for uppercase "CONST"
                  && (  next == nullptr
                     || chunk_is_token(next, CT_BRACED)
                     || chunk_is_token(next, CT_BRACE_OPEN)
