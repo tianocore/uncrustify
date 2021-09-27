@@ -3156,6 +3156,21 @@ void space_text(void)
                  __func__, __LINE__, pc->orig_line, pc->orig_col, pc->elided_text(copy), get_token_name(pc->type));
       }
 
+      // edk2 change - start: Do not modify spacing in assembly blocks
+      if (chunk_is_token(pc, CT_WORD) && ((strcmp(pc->text(), "_asm") == 0) || (strcmp(pc->text(), "__asm") == 0)))
+      {
+         LOG_FMT(LSPACE, "%s(%d): skipping spacing in inline assembly block. orig_line is %zu, orig_col is %zu\n",
+                 __func__, __LINE__, pc->orig_line, pc->orig_col);
+         pc = chunk_get_next_type(pc, CT_BRACE_CLOSE, pc->level);
+
+         if (pc != nullptr)
+         {
+            pc = chunk_get_next(pc);
+         }
+         continue;
+      }
+      // edk2 change - end: Do not modify spacing in assembly blocks
+
       if (  (options::use_options_overriding_for_qt_macros())
          && (  (strcmp(pc->text(), "SIGNAL") == 0)
             || (strcmp(pc->text(), "SLOT") == 0)))

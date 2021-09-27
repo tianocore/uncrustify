@@ -3804,6 +3804,19 @@ void newlines_cleanup_braces(bool first)
       LOG_FMT(LBLANK, "%s(%d): orig_line is %zu, orig_col is %zu, text() is '%s'\n",
               __func__, __LINE__, pc->orig_line, pc->orig_col, pc->elided_text(copy));
 
+      // edk2 change - start: Do not modify newlines in assembly blocks
+      if (chunk_is_token(pc, CT_WORD) && ((strcmp(pc->text(), "_asm") == 0) || (strcmp(pc->text(), "__asm") == 0)))
+      {
+         pc = chunk_get_next_type(pc, CT_BRACE_CLOSE, pc->level);
+
+         if (pc == nullptr)
+         {
+            break;
+         }
+         continue;
+      }
+      // edk2 change - end: Do not modify newlines in assembly blocks
+
       if (  chunk_is_token(pc, CT_IF)
          || chunk_is_token(pc, CT_CONSTEXPR))
       {

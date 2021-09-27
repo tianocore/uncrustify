@@ -3461,6 +3461,18 @@ void indent_text(void)
             {
                do_vardefcol = true;
             }
+
+            // edk2 change - start: Do not attempt to indent instruction tokens in inline assembly
+            if ((frm.size() > 0) && (frm.top().type == CT_BRACE_OPEN))
+            {
+               chunk_t *pse_prev = chunk_get_prev_ncnnl(frm.top().pc);
+
+               if ((pse_prev != nullptr) && ((strcmp(pse_prev->text(), "_asm") == 0) || (strcmp(pse_prev->text(), "__asm") == 0)))
+               {
+                  do_vardefcol = false;
+               }
+            }
+            // edk2 change - end: Do not attempt to indent instruction tokens in inline assembly
          }
          //LOG_FMT(LINDENT2, "%s(%d): GUY 2:\n", __func__, __LINE__);
 

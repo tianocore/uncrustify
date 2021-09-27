@@ -69,6 +69,17 @@ chunk_t *align_var_def_brace(chunk_t *start, size_t span, size_t *p_nl_count)
       chunk_t *pc = chunk_get_next_type(start, CT_BRACE_CLOSE, start->level);
       return(chunk_get_next_ncnnl(pc));
    }
+
+   // edk2 change - start: Do not attempt to align instruction tokens in inline assembly
+   if (chunk_is_token(prev, CT_WORD) && ((strcmp(prev->text(), "_asm") == 0) || (strcmp(prev->text(), "__asm") == 0)))
+   {
+      LOG_FMT(LAVDB, "%s(%d): skipping alignment in inline assembly block '%s' on orig_line %zu\n",
+              __func__, __LINE__, prev->text(), prev->orig_line);
+
+      chunk_t *pc = chunk_get_next_type(start, CT_BRACE_CLOSE, start->level);
+      return(chunk_get_next_ncnnl(pc));
+   }
+   // edk2 change - end: Do not attempt to align instruction tokens in inline assembly
    char copy[1000];
 
    LOG_FMT(LAVDB, "%s(%d): start->text() '%s', type is %s, on orig_line %zu\n",

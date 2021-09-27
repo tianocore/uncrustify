@@ -41,6 +41,18 @@ void remove_extra_semicolons(void)
 
    while (pc != nullptr)
    {
+      // edk2 change - start: Do not modify semicolons in assembly blocks
+      if (chunk_is_token(pc, CT_WORD) && ((strcmp(pc->text(), "_asm") == 0) || (strcmp(pc->text(), "__asm") == 0)))
+      {
+         pc = chunk_get_next_type(pc, CT_BRACE_CLOSE, pc->level);
+
+         if (pc == nullptr)
+         {
+            break;
+         }
+         continue;
+      }
+      // edk2 change - end: Do not modify semicolons in assembly blocks
       chunk_t *next = chunk_get_next_ncnnl(pc);
       chunk_t *prev;
 
