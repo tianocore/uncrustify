@@ -1731,6 +1731,25 @@ static void add_func_header(c_token_t type, file_mem &fm)
 
       while ((ref = chunk_get_prev(ref)) != nullptr)
       {
+         //
+         // edk2 change - start: Prevent function header comments from being placed in __declspec attributes
+         //                      Function headers could be placed in the middle of __declspec attributes without
+         //                      this change.
+         //
+         if (chunk_is_token(ref, CT_PAREN_CLOSE) || chunk_is_token(ref, CT_FPAREN_CLOSE))
+         {
+            chunk_t *open_paren = chunk_skip_to_match_rev(ref);
+
+            if (  (open_paren != nullptr)
+               && (open_paren->prev != nullptr)
+               && ((open_paren->prev->type == CT_DECLSPEC) || (open_paren->prev->type == CT_ATTRIBUTE)))
+            {
+               ref = open_paren->prev;
+               continue;
+            }
+         }
+         // edk2 change - end: Prevent function header comments from being placed in __declspec attributes
+
          // Bail if we change level or find an access specifier colon
          if (  ref->level != pc->level
             || chunk_is_token(ref, CT_ACCESS_COLON))
