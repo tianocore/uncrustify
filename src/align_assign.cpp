@@ -153,6 +153,12 @@ chunk_t *align_assign(chunk_t *first, size_t span, size_t thresh, size_t *p_nl_c
 
       if (chunk_is_newline(pc))
       {
+         // edk2 change - start: Do not align across multiple consecutive newlines
+         //  if (options::align_edk2_style())
+         //  {
+         //     // TODO: Add alignment customizations
+         //  }
+         // edk2 change - end: Do not align across multiple consecutive newlines
          as.NewLines(pc->nl_count);
          vdas.NewLines(pc->nl_count);
          fcn_idx = 0;
