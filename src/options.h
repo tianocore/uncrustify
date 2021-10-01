@@ -3162,6 +3162,13 @@ align_right_cmt_same_level;
 extern BoundedOption<unsigned, 0, 200>
 align_right_cmt_at_col;
 
+// Whether to apply alignment customizations specially created for edk2 style
+// code. This currently involves not aligning assignments that are non-contiguous.
+// The behavior might be tweaked over time until finalized, at which point,
+// the final behavior might be split into generic options.
+extern Option<bool>
+align_edk2_style;
+
 // The span for aligning function prototypes.
 //
 // 0: Don't align (default).
