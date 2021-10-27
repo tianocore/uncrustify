@@ -342,6 +342,7 @@
       <F N="cpp.test"/>
       <F N="d.test"/>
       <F N="difftest.sh"/>
+      <F N="edk2.test"/>
       <F N="java.test"/>
       <F N="objective-c.test"/>
       <F N="pawn.test"/>

@@ -1,0 +1,14 @@
+#
+# Test cases created during the EDK II adoption of uncrustify.
+#
+# Note: Some of these tests can likely move to more generic areas such
+#       the C language tests. They are kept here to prevent conflicts
+#       from syncing with the upstream and to easily identify the tests
+#       so they can be filtered appropriately in the future.
+#
+# Range: 00000 - 09999
+# test.name  config.file  input.file
+
+# pre-processor
+
+00000  edk2.cfg                             edk2/preproc-string-comment.c

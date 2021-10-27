@@ -9,6 +9,7 @@ set(test_suites
     cpp.test
     d.test
     ecma.test
+    edk2.test
     imported.test
     java.test
     objective-c.test
