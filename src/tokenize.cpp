@@ -2143,11 +2143,19 @@ static bool parse_next(tok_ctx &ctx, chunk_t &pc, const chunk_t *prev_pc)
       ctx.save(ss);
       // Chunk to a newline or comment
       set_chunk_type(&pc, CT_PREPROC_BODY);
-      size_t last = 0;
+      size_t last         = 0;
+      bool   in_pp_string = false; // edk2 change: Do not consider comment characters in pre-processor strings
 
       while (ctx.more())
       {
          size_t ch = ctx.peek();
+
+         // edk2 change - start: Do not consider comment characters in pre-processor strings
+         if (language_is_set(LANG_C | LANG_CPP) && (ch == '"') && (last != '\\'))
+         {
+            in_pp_string = !in_pp_string;
+         }
+         // edk2 change - end: Do not consider comment characters in pre-processor strings
 
          // Fix for issue #1752
          // Ignoring extra spaces after ' \ ' for preproc body continuations
@@ -2173,7 +2181,8 @@ static bool parse_next(tok_ctx &ctx, chunk_t &pc, const chunk_t *prev_pc)
          // Quit on a C or C++ comment start           Issue #1966
          if (  (ch == '/')
             && (  (ctx.peek(1) == '/')
-               || (ctx.peek(1) == '*')))
+               || (ctx.peek(1) == '*')) // edk2 change: Do not consider comment characters in pre-processor strings
+            && !in_pp_string)           // edk2 change: Do not consider comment characters in pre-processor strings
          {
             break;
          }
