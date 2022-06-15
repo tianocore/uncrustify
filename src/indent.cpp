@@ -2589,11 +2589,15 @@ void indent_text(void)
             frm.top().indent_tmp = frm.top().indent;
             log_indent_tmp();
          }
-         else if (  chunk_is_token(pc, CT_PAREN_OPEN)
-                 && !chunk_is_newline(chunk_get_next(pc))
-                 && !options::indent_align_paren()
-                 && !pc->flags.test(PCF_IN_SPAREN))
+         // edk2 change - start: Do not indent align parenthesized expressions in array-like assignments
+         else if (  (  chunk_is_token(pc, CT_PAREN_OPEN)
+                    && pc->flags.test(PCF_IN_ARRAY_ASSIGN))
+                 || (  chunk_is_token(pc, CT_PAREN_OPEN)
+                    && !chunk_is_newline(chunk_get_next(pc))
+                    && !options::indent_align_paren()
+                    && !pc->flags.test(PCF_IN_SPAREN)))
          {
+            // edk2 change - end: Do not indent align parenthesized expressions in array-like assignments
             log_rule_B("indent_align_paren");
             int idx = static_cast<int>(frm.size()) - 2;
 
