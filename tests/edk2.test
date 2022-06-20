@@ -12,3 +12,4 @@
 # pre-processor
 
 00000  edk2.cfg                             edk2/preproc-string-comment.c
+00001  edk2.cfg                             edk2/struct-init-indent.c
