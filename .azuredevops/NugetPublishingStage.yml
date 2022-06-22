@@ -39,12 +39,12 @@ strategy:
     'Debug':
       build_type: debug
       linux_pipeline_name: 'Ubuntu GCC Latest Debug'
-      windows_pipeline_name: 'Windows VS2019 Debug'
+      windows_pipeline_name: 'Windows VS Debug'
     'Release':
       build_type: release
       target_os: ubuntu
       linux_pipeline_name: 'Ubuntu GCC Latest Release'
-      windows_pipeline_name: 'Windows VS2019 Release'
+      windows_pipeline_name: 'Windows VS Release'
 
 pool:
   vmImage: windows-latest

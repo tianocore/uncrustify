@@ -21,4 +21,4 @@ stages:
   parameters:
     build_os: windows
     build_type: debug
-    generator: Visual Studio 16 2019
+    generator: Visual Studio 17 2022

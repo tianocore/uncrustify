@@ -20,7 +20,7 @@ parameters:
   - release
 - name: generator
   type: string
-  default: Visual Studio 16 2019
+  default: Visual Studio 17 2022
 - name: python_version
   type: string
   default: 3.9.x
