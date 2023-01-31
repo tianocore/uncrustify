@@ -12,9 +12,21 @@ steps:
     script: |
       mkdir build
       cd build
-      cmake -DUNCRUSTIFY_SEPARATE_TESTS=ON -G "${GENERATOR}" .. | tee cmake_gen_log.txt
-      cmake --build . --config $BUILD_TYPE | tee build_log.txt
-  displayName: macOS Build
+      cmake -DUNCRUSTIFY_SEPARATE_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -G "${GENERATOR}" .. | tee cmake_gen_log.txt
+      cmake --build . --config Debug| tee build_log.txt
+  displayName: macOS Debug Build
+  condition: eq(variables['build_type'], 'debug')
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: |
+      mkdir build
+      cd build
+      cmake -DUNCRUSTIFY_SEPARATE_TESTS=ON -DCMAKE_BUILD_TYPE=Release -G "${GENERATOR}" .. | tee cmake_gen_log.txt
+      cmake --build . --config Release| tee build_log.txt
+  displayName: macOS Release Build
+  condition: eq(variables['build_type'], 'release')
 
 # Copy the executable from a build type specific directory to the upper build directory
 - task: CopyFiles@2
