@@ -33,6 +33,8 @@ variables:
   value: ubuntu
 - name: windows_target_os_name
   value: windows
+- name: macos_target_os_name
+  value: macOs
 
 strategy:
   matrix:
@@ -40,11 +42,13 @@ strategy:
       build_type: debug
       linux_pipeline_name: 'Ubuntu GCC Latest Debug'
       windows_pipeline_name: 'Windows VS Debug'
+      macos_pipeline_name: 'MacOS Xcode Latest Debug'
     'Release':
       build_type: release
       target_os: ubuntu
       linux_pipeline_name: 'Ubuntu GCC Latest Release'
       windows_pipeline_name: 'Windows VS Release'
+      macos_pipeline_name: 'MacOS Xcode Latest Release'
 
 pool:
   vmImage: windows-latest
@@ -118,6 +122,20 @@ steps:
     artifactName: 'Executable'
     downloadPath: '$(Build.StagingDirectory)/Artifacts/Windows-x86'
 
+- task: DownloadBuildArtifacts@0
+  name: DownloadMacOsBuildArtifacts
+  displayName: Download $(macos_target_os_name).x64.$(build_type) Build Artifacts
+  inputs:
+    buildType: 'specific'
+    project: $(System.TeamProject)
+    pipeline: $(macos_pipeline_name)
+    specificBuildWithTriggering: true
+    buildVersionToDownload: 'latest'       # Change to accept a specific version in the future (if needed)
+    tags: 'release'                        # Only publish builds with the "release" tag set
+    downloadType: 'single'
+    artifactName: 'Executable'
+    downloadPath: '$(Build.StagingDirectory)/Artifacts/MacOs-x86'
+
 - task: CopyFiles@2
   displayName: "Copy Linux Executable"
   inputs:
@@ -131,6 +149,14 @@ steps:
   inputs:
     targetFolder: '$(Build.StagingDirectory)/Nuget/package_contents/Windows-x86'
     SourceFolder: '$(Build.StagingDirectory)/Artifacts/Windows-x86'
+    contents: '**'
+    flattenFolders: true
+
+- task: CopyFiles@2
+  displayName: "Copy MacOS Executable"
+  inputs:
+    targetFolder: '$(Build.StagingDirectory)/Nuget/package_contents/MacOs-x86'
+    SourceFolder: '$(Build.StagingDirectory)/Artifacts/MacOs-x86'
     contents: '**'
     flattenFolders: true
 

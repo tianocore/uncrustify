@@ -12,6 +12,7 @@ parameters:
   values:
   - ubuntu
   - windows
+  - macOS
 - name: build_type
   type: string
   default: debug
@@ -75,6 +76,8 @@ stages:
       - template: templates/LinuxBuildSteps.yml
     - ${{ if eq(parameters.build_os, 'windows') }}:
       - template: templates/WindowsBuildSteps.yml
+    - ${{ if eq(parameters.build_os, 'macOs') }}:
+      - template: templates/MacOsBuildSteps.yml
 
     - task: CopyFiles@2
       inputs:

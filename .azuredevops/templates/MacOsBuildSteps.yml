@@ -1,0 +1,28 @@
+## @file
+# Azure Pipeline application build steps to build Uncrustify on macOS
+#
+# Copyright (c) Microsoft Corporation.
+#
+##
+
+steps:
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: |
+      mkdir build
+      cd build
+      cmake -DUNCRUSTIFY_SEPARATE_TESTS=ON -G "${GENERATOR}" .. | tee cmake_gen_log.txt
+      cmake --build . --config $BUILD_TYPE | tee build_log.txt
+  displayName: macOS Build
+
+# Copy the executable from a build type specific directory to the upper build directory
+- task: CopyFiles@2
+  inputs:
+    sourceFolder: '$(Build.SourcesDirectory)/build'
+    targetFolder: '$(Build.SourcesDirectory)/build'
+    contents: '**/$(application_executable_name)'
+    flattenFolders: true
+  displayName: Copy Uncrustify Executable on macOS Builds
+  condition: and(succeeded(), ne(variables['build_type'], 'xcross'))
+
