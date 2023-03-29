@@ -105,11 +105,11 @@ steps:
     buildVersionToDownload: 'latest'       # Change to accept a specific version in the future (if needed)
     tags: 'release'                        # Only publish builds with the "release" tag set
     downloadType: 'single'
-    artifactName: 'Executable'
+    artifactName: 'Executable_x64'
     downloadPath: '$(Build.StagingDirectory)/Artifacts/Linux-x86'
 
 - task: DownloadBuildArtifacts@0
-  name: DownloadWindowsBuildArtifacts
+  name: DownloadWindowsBuildArtifacts_x86
   displayName: Download $(windows_target_os_name).x64.$(build_type) Build Artifacts
   inputs:
     buildType: 'specific'
@@ -119,8 +119,22 @@ steps:
     buildVersionToDownload: 'latest'       # Change to accept a specific version in the future (if needed)
     tags: 'release'                        # Only publish builds with the "release" tag set
     downloadType: 'single'
-    artifactName: 'Executable'
+    artifactName: 'Executable_x64'
     downloadPath: '$(Build.StagingDirectory)/Artifacts/Windows-x86'
+
+- task: DownloadBuildArtifacts@0
+  name: DownloadWindowsBuildArtifacts_ARM
+  displayName: Download $(windows_target_os_name).arm64.$(build_type) Build Artifacts
+  inputs:
+    buildType: 'specific'
+    project: $(System.TeamProject)
+    pipeline: $(windows_pipeline_name)
+    specificBuildWithTriggering: true
+    buildVersionToDownload: 'latest'       # Change to accept a specific version in the future (if needed)
+    tags: 'release'                        # Only publish builds with the "release" tag set
+    downloadType: 'single'
+    artifactName: 'Executable_arm64'
+    downloadPath: '$(Build.StagingDirectory)/Artifacts/Windows-ARM'
 
 - task: DownloadBuildArtifacts@0
   name: DownloadMacOsBuildArtifacts
@@ -133,7 +147,7 @@ steps:
     buildVersionToDownload: 'latest'       # Change to accept a specific version in the future (if needed)
     tags: 'release'                        # Only publish builds with the "release" tag set
     downloadType: 'single'
-    artifactName: 'Executable'
+    artifactName: 'Executable_x64'
     downloadPath: '$(Build.StagingDirectory)/Artifacts/MacOs-x86'
 
 - task: CopyFiles@2
@@ -145,10 +159,18 @@ steps:
     flattenFolders: true
 
 - task: CopyFiles@2
-  displayName: "Copy Windows Executable"
+  displayName: "Copy Windows-x86 Executable"
   inputs:
     targetFolder: '$(Build.StagingDirectory)/Nuget/package_contents/Windows-x86'
     SourceFolder: '$(Build.StagingDirectory)/Artifacts/Windows-x86'
+    contents: '**'
+    flattenFolders: true
+
+- task: CopyFiles@2
+  displayName: "Copy Windows-ARM Executable"
+  inputs:
+    targetFolder: '$(Build.StagingDirectory)/Nuget/package_contents/Windows-ARM'
+    SourceFolder: '$(Build.StagingDirectory)/Artifacts/Windows-ARM'
     contents: '**'
     flattenFolders: true
 

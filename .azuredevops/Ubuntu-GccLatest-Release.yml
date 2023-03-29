@@ -20,5 +20,7 @@ stages:
 - template: BuildStage.yml
   parameters:
     build_os: ubuntu
+    build_version: '20.04'
     build_type: release
     generator: ' '
+    target_arch: x64
