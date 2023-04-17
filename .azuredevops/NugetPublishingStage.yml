@@ -95,7 +95,7 @@ steps:
   displayName: 'Install tools'
 
 - task: DownloadBuildArtifacts@0
-  name: DownloadLinuxBuildArtifacts
+  name: DownloadLinuxBuildArtifacts_x86
   displayName: Download $(linux_target_os_name).x64.$(build_type) Build Artifacts
   inputs:
     buildType: 'specific'
@@ -107,6 +107,20 @@ steps:
     downloadType: 'single'
     artifactName: 'Executable_x64'
     downloadPath: '$(Build.StagingDirectory)/Artifacts/Linux-x86'
+
+- task: DownloadBuildArtifacts@0
+  name: DownloadLinuxBuildArtifacts_ARM
+  displayName: Download $(windows_target_os_name).arm64.$(build_type) Build Artifacts
+  inputs:
+    buildType: 'specific'
+    project: $(System.TeamProject)
+    pipeline: $(linux_pipeline_name)
+    specificBuildWithTriggering: true
+    buildVersionToDownload: 'latest'       # Change to accept a specific version in the future (if needed)
+    tags: 'release'                        # Only publish builds with the "release" tag set
+    downloadType: 'single'
+    artifactName: 'Executable_arm64'
+    downloadPath: '$(Build.StagingDirectory)/Artifacts/Linux-ARM'
 
 - task: DownloadBuildArtifacts@0
   name: DownloadWindowsBuildArtifacts_x86
@@ -151,10 +165,18 @@ steps:
     downloadPath: '$(Build.StagingDirectory)/Artifacts/MacOs-x86'
 
 - task: CopyFiles@2
-  displayName: "Copy Linux Executable"
+  displayName: "Copy Linux-86 Executable"
   inputs:
     targetFolder: '$(Build.StagingDirectory)/Nuget/package_contents/Linux-x86'
     SourceFolder: '$(Build.StagingDirectory)/Artifacts/Linux-x86'
+    contents: '**'
+    flattenFolders: true
+
+- task: CopyFiles@2
+  displayName: "Copy Linux-ARM Executable"
+  inputs:
+    targetFolder: '$(Build.StagingDirectory)/Nuget/package_contents/Linux-ARM'
+    SourceFolder: '$(Build.StagingDirectory)/Artifacts/Linux-ARM'
     contents: '**'
     flattenFolders: true
 

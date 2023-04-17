@@ -5,8 +5,32 @@
 #
 ##
 
+parameters:
+- name: target_arch
+  type: string
+  default: x64
+
 steps:
+- ${{ each parameter in parameters }}:
+    - bash: |
+        if [ "${{ parameter.Key }}" = "target_arch" ]; then
+          allowed_architectures=("x64" "arm64")
+          if [[ ! " ${allowed_architectures[@]} " =~ "${{ parameter.Value }}" ]]; then
+            echo "##vso[task.logissue type=error;]Invalid value '${{ parameter.Value }}' for parameter 'target_arch'. Allowed values are: ${allowed_architectures[@]}"
+            echo "##vso[task.complete result=Failed;]"
+          fi
+        fi
+      displayName: 'Checking ${{ parameter.Key }}'
+
 - script: |
+    if [ ${{ parameters.target_arch }} = 'arm64' ];
+      then mkdir $BUILD_SOURCESDIRECTORY/compiler;
+      # Use the same version of cross compiler carried in https://github.com/microsoft/mu_basecore/blob/release/202208/BaseTools/Bin/gcc_aarch64_linux_ext_dep.yaml
+      wget -O - "https://developer.arm.com/-/media/Files/downloads/gnu/11.2-2022.02/binrel/gcc-arm-11.2-2022.02-x86_64-aarch64-none-linux-gnu.tar.xz" | tar -xJ -C $BUILD_SOURCESDIRECTORY/compiler --strip-components=1
+      C_COMPILER=$BUILD_SOURCESDIRECTORY/compiler/bin/aarch64-none-linux-gnu-gcc;
+      CXX_COMPILER=$BUILD_SOURCESDIRECTORY/compiler/bin/aarch64-none-linux-gnu-g++;
+    fi
+
     if [ -n "${C_COMPILER}" ]; then export CC="${C_COMPILER}"; fi
     if [ -n "${CXX_COMPILER}" ]; then export CXX="${CXX_COMPILER}"; fi
     ${CXX} --version

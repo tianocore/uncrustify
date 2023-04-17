@@ -68,3 +68,6 @@ cmake-build-*/
 
 # VS Code files
 .vs/
+
+# Downloaded cross compilers
+compiler/

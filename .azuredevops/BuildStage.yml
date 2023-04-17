@@ -94,6 +94,8 @@ stages:
     # Run OS-specific build commands
     - ${{ if eq(parameters.build_os, 'ubuntu') }}:
       - template: templates/LinuxBuildSteps.yml
+        parameters:
+          target_arch: $(Build.TargetArch)
     - ${{ if eq(parameters.build_os, 'windows') }}:
       - template: templates/WindowsBuildSteps.yml
         parameters:

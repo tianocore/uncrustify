@@ -23,4 +23,4 @@ stages:
     build_version: '20.04'
     build_type: debug
     generator: ' '
-    target_arch: x64
+    target_arch: x64,arm64
