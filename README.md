@@ -10,6 +10,131 @@
 # Uncrustify
 A source code beautifier for C, C++, C#, ObjectiveC, D, Java, Pawn and VALA
 
+## Tianocore Fork Notes (Uncrustify Customizations for EDK II Source Code)
+
+* Upstream Github repository: https://github.com/uncrustify/uncrustify
+
+### Skip to Using EDK II Fork Steps 🏃
+
+If you are just interested in the steps necessary to run the EDK II fork of Uncrustify against your code, visit the
+[Tianocore Code Formatting wiki page](https://github.com/tianocore/tianocore.github.io/wiki/EDK-II-Code-Formatting).
+
+### EDK II Details
+
+This fork explores the use of Uncrustify for edk2 source code. The goal being to establish a configuration
+for the tool that closely adheres to the
+[EDK II C Coding Standards Specification](https://edk2-docs.gitbook.io/edk-ii-c-coding-standards-specification/). By
+doing so, the tool can be used by developers to help reduce some of the tedious work involved in understanding and
+applying the rules in the specification to their code. For general background on rationale behind the current set
+of style guidelines and arguments for uniformity of style across the codebase, refer to the coding standards
+specification.
+
+The results from this tool should be considered a "best effort". Part of the work in the fork involves identifying
+shortcomings and areas of ambiguity and deciding upon the best course of action. For example, Uncrustify
+is highly customizable (as of version 0.72.0, 742 configuration options exist), eventually a scenario will have an
+explicit rule defined in the Uncrustify configuration that was not explicitly defined in the coding standards
+specification. A consensus must be reached about how to treat that particular scenario. In turn, the specification
+might be updated to reflect this change. In other cases, a rule in the specification might not be enforceable in
+Uncrustify as-is. Several options exist:
+
+1. Ignore the rule in Uncrustify
+2. Update the EDK II C Coding Standards Specification
+3. Submit an upstream change to Uncrustify
+4. Maintain an edk2 fork of Uncrustify with the change
+
+Essential changes required in the Uncrustify tool led to this fork of Uncrustify for edk2.
+
+Ideally, the changes could be upstreamed and the fork eliminated. The goal of this fork is to provide a dedicated area
+for adapting Uncrustify to best support edk2 source code not to maintain a long term deviation from the mainline.
+
+### Background
+
+This work began by researching open source beautifiers capable of checking and formatting C/C++ source code
+based on a set of rules in a configuration file. Three final options were considered:
+
+1. [clang-format](https://clang.llvm.org/docs/ClangFormat.html) -
+   [Not enough customization](https://clang.llvm.org/docs/ClangFormatStyleOptions.html). The tool has active
+   development but the configuration file options available at the time were severely lacking what is needed
+   to come close to the EDK II C Coding Standards Specification.
+2. [Vera++](https://bitbucket.org/verateam/vera/wiki/Home) -
+   [Not enough customization](https://bitbucket.org/verateam/vera/wiki/Rules). Development of the tool was not
+   very active and the limited set of customization options made this a non-starter.
+3. [Uncrustify](https://github.com/uncrustify/uncrustify) - The tool has active development and detailed customization
+   options.
+
+### Repository Branching Strategy
+
+This repository maintains the following branches:
+
+1. `master` - This is a direct copy of the upstream Uncrustify `master` branch. It is updated
+   periodically to pull in upstream changes. This branch should be considered the "upstream" fork main.
+   > ℹ️ _Note:_ The `master` branch is not used for any edk2-specific changes. It is only used to track upstream
+     changes and provide a reference point for the `edk2/master` branch.
+2. `edk2/master` - Contains edk2-specific changes on top of the `master` branch. This should be considered the "edk2"
+   fork master.
+
+The `master` branch is updated when a bug fix or feature needs to be pulled into the fork (there is not a set frequency).
+
+To reduce maintenance overhead, these are currently the only two branches. If a strong need arises to base the edk2 changes
+on Uncrustify releases, release branches will be made with the format `edk2/{uncrustify_release_tag}`. For example, the
+Uncrustify 0.73.0 release would be maintained in the branch `edk2/0_73_0`.
+
+### Current State
+
+A configuration file is present in the edk2 branch(es) of Uncrustify [(`etc/edk2.cfg`)](https://github.com/tianocore/uncrustify/blob/edk2/master/etc/edk2.cfg)
+that has been tweaked to get close to edk2 style. We request you return any changes that improve the file to better
+adhere to the EDK II C Coding Standard so we can keep it up-to-date as the primary reference configuration file for
+the project.
+
+Due to a new configuration file option introduced `indent_func_call_edk2_style`, this branch will not work as-is with
+the mainline version of Uncrustify.
+
+While there's a few minor issues, some noteworthy deficiencies are below.
+
+#### Missing: Naming Convention Check
+
+See [3.1 Naming](https://edk2-docs.gitbook.io/edk-ii-c-coding-standards-specification/3_quick_reference#3-1-naming).
+
+Many of the naming conventions can be likely be checked with a different tool. The most common violations include:
+
+* Unclear variable names
+* Not defining non-standard abbreviations/acronyms in the header file
+* Not using Pascal case
+* Capitalizing acronyms (e.g. MyPCIAddress)
+* Not separating distinct words with an underscore in macro names (e.g. EACH_WORD_ISNOT_SEPARATE)
+* Usage of Hungarian notation
+* Global variables not prefixed with (g) and module variables not prefixed with (m)
+
+The following issues in the main version of Uncrustify are what led to the fork. **They are resolved in the fork** but
+information concerning the issues are kept here for reference.
+
+### Key Issues Addressed in the Uncrustify Fork
+
+#### Function Call Format
+
+See [5.2.2.4](https://edk2-docs.gitbook.io/edk-ii-c-coding-standards-specification/5_source_files/52_spacing#5-2-2-4-subsequent-lines-of-multi-line-function-calls-should-line-up-two-spaces-from-the-beginning-of-the-function-name).
+
+Uncrustify feature request:
+[Feature Request: Multi-line function call argument indentation from function name · Issue #3077](https://github.com/uncrustify/uncrustify/issues/3077)
+
+* The problem is that Uncrustify cannot indent function call arguments relative to the start of a function name.
+* Uncrustify can indent function call arguments relative to the block indentation level or the open parenthesis level
+  and/or align multi-line arguments to the first argument.
+* Uncrustify can keep the first argument on the same line as the opening parenthesis or move it to the next line for
+  a multi-line argument list.
+
+#### Special Handling for DEBUG ()
+
+Due to the way arguments to the `DEBUG ()` macro are substituted internally, the actual argument list is surrounded by
+a pair of two opening and closing parenthesis.
+
+This is uniquely different than the convention for other function / function macros which would normally put the
+parenthesis on the next line to form a new indentation level.
+
+* Uncrustify cannot make an exception for the `DEBUG ()` macro as-is.
+
+---
+
 ## Features
 * Highly configurable - 753 configurable options as of version 0.73.0
 - <details><summary>add/remove spaces</summary>
