@@ -1,0 +1,283 @@
+# @file build-and-test.yml
+#
+# A GitHub workflow to bulid, test, and release uncrustify across multiple platforms.
+#
+##
+# Copyright (c) Microsoft Corporation.
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+##
+
+name: Build and Test Uncrustify
+
+on:
+  push:
+    branches:
+      - master
+      - edk2/master
+      - 'release/**'
+  pull_request:
+    branches:
+      - master
+      - edk2/master
+  workflow_dispatch:
+    inputs:
+      build_os:
+        description: 'Build OS'
+        required: true
+        default: 'ubuntu'
+        type: choice
+        options:
+          - ubuntu
+          - windows
+          - macos
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+          - coverage
+          - asan
+          - ubsan
+          - cross
+      python_version:
+        description: 'Python version'
+        required: false
+        default: '3.11'
+        type: string
+      target_arch:
+        description: 'Target architecture'
+        required: true
+        default: 'x64'
+        type: choice
+        options:
+          - x64
+          - arm64
+          - x64,arm64
+  release:
+    types: [published]
+
+env:
+  BUILD_TYPE: ${{ github.event.inputs.build_type || 'debug' }}
+  PYTHON_VERSION: ${{ github.event.inputs.python_version || '3.11' }}
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            build_os: ubuntu
+            target_arch: x64
+            skip_test: false
+            executable_name: uncrustify
+          - os: ubuntu-22.04
+            build_os: ubuntu
+            target_arch: arm64
+            skip_test: true
+            executable_name: uncrustify
+          - os: windows-latest
+            build_os: windows
+            target_arch: x64
+            skip_test: false
+            executable_name: uncrustify.exe
+          - os: windows-latest
+            build_os: windows
+            target_arch: arm64
+            skip_test: true
+            executable_name: uncrustify.exe
+          - os: macos-latest
+            build_os: macos
+            target_arch: x64
+            skip_test: false
+            executable_name: uncrustify
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          clean: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: 'x64'
+
+      - name: Set Generator
+        id: set-generator
+        run: |
+          if [ "${{ matrix.build_os }}" = "windows" ]; then
+            echo "generator=Visual Studio 17 2022" >> $GITHUB_OUTPUT
+          else
+            echo "generator=Ninja" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      - name: Install Ninja (Linux only)
+        if: matrix.build_os == 'ubuntu'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Setup ARM64 Cross-Compiler (Linux ARM64 only)
+        if: matrix.build_os == 'ubuntu' && matrix.target_arch == 'arm64'
+        run: |
+          mkdir -p ${{ github.workspace }}/compiler
+          wget -O - "https://developer.arm.com/-/media/Files/downloads/gnu/11.2-2022.02/binrel/gcc-arm-11.2-2022.02-x86_64-aarch64-none-linux-gnu.tar.xz" | tar -xJ -C ${{ github.workspace }}/compiler --strip-components=1
+          echo "CC=${{ github.workspace }}/compiler/bin/aarch64-none-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CXX=${{ github.workspace }}/compiler/bin/aarch64-none-linux-gnu-g++" >> $GITHUB_ENV
+
+      - name: Build (Linux)
+        if: matrix.build_os == 'ubuntu'
+        run: |
+          mkdir build
+          cd build
+          GENERATOR_FLAG=""
+          if [ "${{ env.GENERATOR }}" = "Ninja" ]; then
+            GENERATOR_FLAG="-GNinja"
+          fi
+          case "${{ env.BUILD_TYPE }}" in
+            coverage)
+              cmake $GENERATOR_FLAG -DCMAKE_BUILD_TYPE=Debug -DENABLE_CODECOVERAGE=ON .. | tee cmake_gen_log.txt
+              ;;
+            asan)
+              cmake $GENERATOR_FLAG -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZER=address .. | tee cmake_gen_log.txt
+              ;;
+            ubsan)
+              cmake $GENERATOR_FLAG -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZER=undefined .. | tee cmake_gen_log.txt
+              ;;
+            cross)
+              cmake $GENERATOR_FLAG -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-mingw64.cmake -DCMAKE_EXE_LINKER_FLAGS="-static -s" .. | tee cmake_gen_log.txt
+              ;;
+            release)
+              cmake $GENERATOR_FLAG -DCMAKE_BUILD_TYPE=Release .. | tee cmake_gen_log.txt
+              ;;
+            *)
+              SEPARATE_TESTS="ON"
+              if [ "${{ matrix.target_arch }}" = "arm64" ]; then
+                SEPARATE_TESTS="OFF"
+              fi
+              cmake $GENERATOR_FLAG -DUNCRUSTIFY_SEPARATE_TESTS=$SEPARATE_TESTS -DCMAKE_BUILD_TYPE=Debug .. | tee cmake_gen_log.txt
+              ;;
+          esac
+          if [ -f build.ninja ]; then
+            ninja -v | tee build_log.txt
+          else
+            make VERBOSE=1 | tee build_log.txt
+          fi
+        env:
+          GENERATOR: ${{ steps.set-generator.outputs.generator }}
+
+      - name: Build (Windows)
+        if: matrix.build_os == 'windows'
+        shell: pwsh
+        run: |
+            mkdir build
+            cd build
+            $run_test = if ('${{ matrix.skip_test }}' -eq 'true') { 'OFF' } else { 'ON' }
+            cmake -DUNCRUSTIFY_SEPARATE_TESTS="$run_test" -G "${{ env.GENERATOR }}" -A ${{ matrix.target_arch }} .. | Tee-Object -FilePath cmake_gen_log.txt
+            cmake --build . --config "${{ env.BUILD_TYPE }}" | Tee-Object -FilePath build_log.txt
+        env:
+          GENERATOR: ${{ steps.set-generator.outputs.generator }}
+
+      - name: Build (macOS)
+        if: matrix.build_os == 'macos'
+        run: |
+          mkdir build
+          cd build
+          if [ "${{ env.BUILD_TYPE }}" = "debug" ]; then
+            cmake -DUNCRUSTIFY_SEPARATE_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -G "${{ env.GENERATOR }}" .. | tee cmake_gen_log.txt
+            cmake --build . --config Debug | tee build_log.txt
+          else
+            cmake -DUNCRUSTIFY_SEPARATE_TESTS=ON -DCMAKE_BUILD_TYPE=Release -G "${{ env.GENERATOR }}" .. | tee cmake_gen_log.txt
+            cmake --build . --config Release | tee build_log.txt
+          fi
+        env:
+          GENERATOR: ${{ steps.set-generator.outputs.generator }}
+
+      - name: Copy Windows Executable
+        if: matrix.build_os == 'windows'
+        shell: cmd
+        run: |
+          copy "build\${{ env.BUILD_TYPE }}\${{ matrix.executable_name }}" "build\"
+
+      - name: Copy macOS Executable
+        if: matrix.build_os == 'macos'
+        run: |
+          find build -name "${{ matrix.executable_name }}" -type f -exec cp {} build/ \;
+
+      - name: Upload Build Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build_Logs_${{ matrix.build_os }}_${{ matrix.target_arch }}
+          path: build/*_log.txt
+          if-no-files-found: ignore
+
+      - name: Upload Documentation
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Documentation_${{ matrix.build_os }}_${{ matrix.target_arch }}
+          path: build/uncrustify.1
+          if-no-files-found: ignore
+
+      - name: Upload Executable
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Executable_${{ matrix.build_os }}_${{ matrix.target_arch }}
+          path: build/${{ matrix.executable_name }}
+          if-no-files-found: error
+
+      - name: Run cTest Unit Tests
+        if: success() && !matrix.skip_test && env.BUILD_TYPE != 'cross'
+        working-directory: build
+        run: python ../scripts/run_ctest.py -- -C ${{ env.BUILD_TYPE }}
+
+      - name: Upload Test Results
+        if: always() && !matrix.skip_test && env.BUILD_TYPE != 'cross'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Test_Results_${{ matrix.build_os }}_${{ matrix.target_arch }}
+          path: build/**/Test.xml
+          if-no-files-found: ignore
+
+  upload-release-assets:
+    name: Upload Release Assets
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Organize executables for release
+        run: |
+          mkdir -p release/Linux-ARM release/Linux-x86 release/MacOs-x86 release/Windows-ARM release/Windows-x86
+          # Linux ARM
+          find artifacts/Executable_ubuntu_arm64 -type f -name "uncrustify" -exec cp {} release/Linux-ARM/uncrustify \;
+          # Linux x86
+          find artifacts/Executable_ubuntu_x64 -type f -name "uncrustify" -exec cp {} release/Linux-x86/uncrustify \;
+          # MacOS x86
+          find artifacts/Executable_macos_x64 -type f -name "uncrustify" -exec cp {} release/MacOs-x86/uncrustify \;
+          # Windows ARM
+          find artifacts/Executable_windows_arm64 -type f -name "uncrustify.exe" -exec cp {} release/Windows-ARM/uncrustify.exe \;
+          # Windows x86
+          find artifacts/Executable_windows_x64 -type f -name "uncrustify.exe" -exec cp {} release/Windows-x86/uncrustify.exe \;
+
+      - name: Zip all executables
+        run: |
+          cd release
+          zip -r ../uncrustify-release.zip .
+
+      - name: Upload single zip to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" uncrustify-release.zip --repo "${{ github.repository }}"
