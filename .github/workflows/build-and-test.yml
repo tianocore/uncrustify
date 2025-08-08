@@ -271,6 +271,10 @@ jobs:
           # Windows x86
           find artifacts/Executable_windows_x64 -type f -name "uncrustify.exe" -exec cp {} release/Windows-x86/uncrustify.exe \;
 
+          chmod +x release/Linux-ARM/uncrustify || true
+          chmod +x release/Linux-x86/uncrustify || true
+          chmod +x release/MacOs-x86/uncrustify || true
+
       - name: Zip all executables
         run: |
           cd release
