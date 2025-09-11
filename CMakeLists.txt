@@ -17,15 +17,8 @@ include(CheckCXXSymbolExists)
 include(CheckTypeSize)
 include(CTest)
 
-if( ${CMAKE_VERSION} VERSION_LESS "3.12" )
-    find_package( PythonInterp )
-    if( NOT PYTHON_EXECUTABLE )
-        message( FATAL_ERROR "Python is required, but was not found on your system" )
-    endif()
- else( )
-    find_package(Python3 REQUIRED)
-    set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
-endif()
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
 
 #
 # Check compiler flags
@@ -194,7 +187,7 @@ function(py_gen OUTPUT SCRIPT INPUT)
   add_custom_command(
     OUTPUT "${out}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${outdir}"
-    COMMAND ${PYTHON_EXECUTABLE}
+    COMMAND Python3::Interpreter
       "${PROJECT_SOURCE_DIR}/scripts/${SCRIPT}"
       "${out}"
       ${deps}
