@@ -1481,7 +1481,7 @@ static void do_source_file(const char *filename_in,
       cpd.error_count++;
       return;
    }
-   LOG_FMT(LSYS, "Parsing: %s as language %s\n",
+   LOG_FMT(LINFO, "Parsing: %s as language %s\n",
            filename_in, language_name_from_flags(cpd.lang_flags));
 
    cpd.filename = filename_in;
