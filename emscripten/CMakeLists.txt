@@ -38,7 +38,8 @@ include(CheckSymbolExists)
 include(CheckCXXSymbolExists)
 include(CheckTypeSize)
 
-find_package(PythonInterp REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
 
 #
 # Determine config
@@ -153,7 +154,7 @@ function(py_gen OUTPUT SCRIPT INPUT)
   add_custom_command(
     OUTPUT "${out}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${outdir}"
-    COMMAND ${PYTHON_EXECUTABLE}
+    COMMAND Python3::Interpreter
       "${unc_projdir}/scripts/${SCRIPT}"
       "${out}"
       ${deps}
@@ -191,9 +192,9 @@ py_gen(option_enum.cpp
 FILE(GLOB unc_infiles "${unc_projdir}/src/*.cpp")
 
 ADD_EXECUTABLE(${project_name}
-  ${unc_infiles} 
-  ${unc_projdir}/src/token_enum.h 
-  ${unc_projdir}/src/symbols_table.h 
+  ${unc_infiles}
+  ${unc_projdir}/src/token_enum.h
+  ${unc_projdir}/src/symbols_table.h
   ${unc_projdir}/src/options.h
   ${unc_projdir}/src/option.h
   ${PROJECT_BINARY_DIR}/src/options.cpp

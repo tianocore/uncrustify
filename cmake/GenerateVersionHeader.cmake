@@ -1,11 +1,18 @@
 #
+#!/usr/bin/env cmake
 # Generate uncrustify_version.h from uncrustify_version.h.in
 #
-# This script is meant to be executed with `cmake -P` from a custom target,
-# and expects the variables `PYTHON_EXECUTABLE`, `SOURCE_DIR`, `INPUT`,
-# `OUTPUT` and `UNCRUSTIFY_VERSION` to be set.
-#
+# Executed with `cmake -P` from a custom target.
+# Expects: PYTHON_EXECUTABLE (or Python3_EXECUTABLE), SOURCE_DIR, INPUT,
+# OUTPUT and UNCRUSTIFY_VERSION.
 
+if (NOT DEFINED PYTHON_EXECUTABLE AND DEFINED Python3_EXECUTABLE)
+  set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+endif()
+
+if (NOT DEFINED PYTHON_EXECUTABLE)
+  message(FATAL_ERROR "PYTHON_EXECUTABLE not defined for GenerateVersionHeader.cmake")
+endif()
 
 execute_process(
   COMMAND ${PYTHON_EXECUTABLE} ${SOURCE_DIR}/scripts/make_version.py
