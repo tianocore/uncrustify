@@ -93,7 +93,7 @@ jobs:
             executable_name: uncrustify.exe
           - os: macos-latest
             build_os: macos
-            target_arch: x64
+            target_arch: arm64
             skip_test: false
             executable_name: uncrustify
     steps:
@@ -259,13 +259,13 @@ jobs:
 
       - name: Organize executables for release
         run: |
-          mkdir -p release/Linux-ARM release/Linux-x86 release/MacOs-x86 release/Windows-ARM release/Windows-x86
+          mkdir -p release/Linux-ARM release/Linux-x86 release/MacOs-ARM release/Windows-ARM release/Windows-x86
           # Linux ARM
           find artifacts/Executable_ubuntu_arm64 -type f -name "uncrustify" -exec cp {} release/Linux-ARM/uncrustify \;
           # Linux x86
           find artifacts/Executable_ubuntu_x64 -type f -name "uncrustify" -exec cp {} release/Linux-x86/uncrustify \;
           # MacOS x86
-          find artifacts/Executable_macos_x64 -type f -name "uncrustify" -exec cp {} release/MacOs-x86/uncrustify \;
+          find artifacts/Executable_macos_arm64 -type f -name "uncrustify" -exec cp {} release/MacOs-ARM/uncrustify \;
           # Windows ARM
           find artifacts/Executable_windows_arm64 -type f -name "uncrustify.exe" -exec cp {} release/Windows-ARM/uncrustify.exe \;
           # Windows x86
@@ -273,7 +273,7 @@ jobs:
 
           chmod +x release/Linux-ARM/uncrustify || true
           chmod +x release/Linux-x86/uncrustify || true
-          chmod +x release/MacOs-x86/uncrustify || true
+          chmod +x release/MacOs-ARM/uncrustify || true
 
       - name: Zip all executables
         run: |
