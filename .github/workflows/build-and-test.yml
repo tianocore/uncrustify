@@ -105,8 +105,9 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
+          # Use arm64 python only on macOS; Ubuntu and Windows arm64 builds run on x64 hosts
           python-version: ${{ env.PYTHON_VERSION }}
-          architecture: 'x64'
+          architecture: ${{ matrix.build_os == 'macos' && 'arm64' || 'x64' }}
 
       - name: Set Generator
         id: set-generator
